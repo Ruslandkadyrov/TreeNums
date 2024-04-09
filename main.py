@@ -7,6 +7,10 @@ import re
 
 class TreeWindow(QMainWindow):
     class CustomTreeView(QTreeView):
+        def __init__(self, tree_window):
+            super().__init__()
+            self.tree_window = tree_window
+
         def mouseDoubleClickEvent(self, event):
             index = self.indexAt(event.pos())
             item = self.model().itemFromIndex(index)
@@ -16,10 +20,33 @@ class TreeWindow(QMainWindow):
                 if ok:
                     if re.match("^-?\d+$", new_text):
                         item.setText(new_text)
+                        self.tree_window.update_values(item)
                     else:
                         QMessageBox.warning(self, "Error", "Node name should only contain numbers.")
             else:
                 QMessageBox.warning(self, "Error", "Editing is only allowed for leaf nodes.")
+    
+    def update_values(self, item):
+        if item:
+            if item.hasChildren():
+                total_value = 0
+                for i in range(item.rowCount()):
+                    child_item = item.child(i)
+                    child_value = int(child_item.text())
+                    total_value += child_value
+                    self.update_values(child_item)
+                item.setText(str(total_value))
+                
+            parent = item.parent()
+            while parent:
+                total_value = 0
+                for i in range(parent.rowCount()):
+                    child_item = parent.child(i)
+                    child_value = int(child_item.text())
+                    total_value += child_value
+                parent.setText(str(total_value))
+                item = parent
+                parent = item.parent()
 
     def __init__(self):
         super().__init__()
@@ -29,7 +56,7 @@ class TreeWindow(QMainWindow):
         
         self.layout = QVBoxLayout()
         
-        self.tree_view = self.CustomTreeView()
+        self.tree_view = self.CustomTreeView(self)
         self.model = QStandardItemModel()
         self.tree_view.setModel(self.model)
         
@@ -58,6 +85,7 @@ class TreeWindow(QMainWindow):
                 parent_item.appendRow(new_item)
             else:
                 QMessageBox.warning(self, "Error", "Node name should only contain numbers.")
+        self.update_values(parent_item)
 
     def delete_node(self):
         selected_indexes = self.tree_view.selectedIndexes()
@@ -67,6 +95,10 @@ class TreeWindow(QMainWindow):
                 parent = item.parent()
                 if parent:
                     parent.removeRow(item.row())
+                    self.update_values(parent)
+                    if parent.rowCount() == 0:
+                        parent.setText("0")
+                        self.update_values(parent)
                 else:
                     self.model.removeRow(item.row())
             else:
