@@ -2,6 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTreeView, QVBoxLayout, QWidget, QPushButton, QInputDialog, QMessageBox
 from PyQt5.QtGui import QStandardItem, QStandardItemModel
 from PyQt5.QtCore import Qt
+import numpy as np
 import re
 
 
@@ -25,28 +26,22 @@ class TreeWindow(QMainWindow):
                         QMessageBox.warning(self, "Error", "Node name should only contain numbers.")
             else:
                 QMessageBox.warning(self, "Error", "Editing is only allowed for leaf nodes.")
-    
+
     def update_values(self, item):
         if item:
             if item.hasChildren():
-                total_value = 0
+                child_values = np.array([int(item.child(i).text()) for i in range(item.rowCount())])
                 for i in range(item.rowCount()):
-                    child_item = item.child(i)
-                    child_value = int(child_item.text())
-                    total_value += child_value
-                    self.update_values(child_item)
-                item.setText(str(total_value))
-                
+                    self.update_values(item.child(i))
+                item.setText(str(np.sum(child_values)))
+            
             parent = item.parent()
             while parent:
-                total_value = 0
-                for i in range(parent.rowCount()):
-                    child_item = parent.child(i)
-                    child_value = int(child_item.text())
-                    total_value += child_value
-                parent.setText(str(total_value))
+                child_values = np.array([int(parent.child(i).text()) for i in range(parent.rowCount())])
+                parent.setText(str(np.sum(child_values)))
                 item = parent
                 parent = item.parent()
+
 
     def __init__(self):
         super().__init__()
