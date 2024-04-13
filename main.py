@@ -1,3 +1,4 @@
+import random
 import sys
 from PyQt5.QtWidgets import (
     QApplication,
@@ -71,13 +72,19 @@ class TreeWindow(QMainWindow):
         self.layout.addWidget(self.tree_view)
         self.button_add = QPushButton("Добавить узел")
         self.button_delete = QPushButton("Удалить узел")
+        self.button_create_tree = QPushButton("Создать дерево случайной глубины")
+        self.button_fill_values = QPushButton("Заполнить листья дерева")
         self.layout.addWidget(self.button_add)
         self.layout.addWidget(self.button_delete)
+        self.layout.addWidget(self.button_create_tree)
+        self.layout.addWidget(self.button_fill_values)
         self.central_widget = QWidget()
         self.central_widget.setLayout(self.layout)
         self.setCentralWidget(self.central_widget)
         self.button_add.clicked.connect(self.add_node)
         self.button_delete.clicked.connect(self.delete_node)
+        self.button_create_tree.clicked.connect(self.create_random_tree)
+        self.button_fill_values.clicked.connect(self.fill_random_values)
 
         # График
         self.plot_widget = pg.PlotWidget()
@@ -89,6 +96,33 @@ class TreeWindow(QMainWindow):
 
         # Подключаем сигнал к слоту
         self.tree_view.nodeSignal.connect(self.update_plot)
+
+    def create_random_tree(self, parent_item=None, depth=0, max_depth=10, min_depth=5):
+        if depth == 0:
+            parent_item = self.model.invisibleRootItem()
+        if depth >= min_depth:
+            num_children = random.randint(1, 4)
+        else:
+            num_children = 4
+        for _ in range(num_children):
+            new_item = QStandardItem()
+            parent_item.appendRow(new_item)
+            if depth < max_depth and random.random() < 0.50:
+                self.create_random_tree(new_item, depth + 1, max_depth, min_depth)
+
+    def fill_random_values(self):
+        current_item = self.model.invisibleRootItem()
+        self.fill_random_values_recursive(current_item)
+        self.update_values(current_item)
+
+    def fill_random_values_recursive(self, parent_item):
+        if isinstance(parent_item, QStandardItem):
+            if parent_item.rowCount() == 0:
+                parent_item.setText(str(random.randint(0, 100)))
+            else:
+                for row in range(parent_item.rowCount()):
+                    child_item = parent_item.child(row)
+                    self.fill_random_values_recursive(child_item)
 
     def add_node(self):
         parent_index = self.tree_view.currentIndex()
@@ -138,33 +172,26 @@ class TreeWindow(QMainWindow):
     def update_values(self, item):
         if item:
             if item.hasChildren():
-                child_values = np.array(
-                    [
-                        int(
-                            item.child(i).text()
-                        ) for i in range(item.rowCount())
-                    ]
-                )
+                child_values = np.array([
+                    int(item.child(i).text()) if item.child(i).text() else 0 for i in range(item.rowCount())
+                ])
                 for i in range(item.rowCount()):
                     self.update_values(item.child(i))
                 item_value = np.sum(child_values)
                 item.setText(str(item_value))
                 self.checking_sign_second_node(item_value.item(), item)
+            
             parent = item.parent()
             while parent:
-                child_values = np.array(
-                    [
-                        int(
-                            parent.child(i).text()
-                        ) for i in range(parent.rowCount())
-                    ]
-                )
+                child_values = np.array([
+                    int(parent.child(i).text()) if parent.child(i).text() else 0 for i in range(parent.rowCount())
+                ])
                 parent_value = np.sum(child_values)
                 parent.setText(str(parent_value))
                 self.checking_sign_second_node(parent_value.item(), parent)
                 item = parent
                 parent = item.parent()
-        self.tree_view.nodeSignal.emit()
+            self.tree_view.nodeSignal.emit()
 
     def checking_sign_second_node(self, value, node):
         if node.parent() and node.parent().parent() is None:
