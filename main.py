@@ -16,21 +16,32 @@ from PyQt5.QtCore import pyqtSignal
 import numpy as np
 import pyqtgraph as pg
 import re
+import h5py
 
 
+# Создаю окно наследуюясь от QMainWindow
 class TreeWindow(QMainWindow):
+    # Создаю наследника для переопределения двойного клика
     class CustomTreeView(QTreeView):
-        # Сигнал для обновления дерева
+        # Сигнал для обновления графика
         nodeSignal = pyqtSignal()
 
         def __init__(self, tree_window):
             super().__init__()
             self.tree_window = tree_window
 
+        # Метод обработки двойного щелчка мыши на элементе дерева.
         def mouseDoubleClickEvent(self, event):
+            # Получаем индекс элемента дерева по позиции клика мыши в event.pos().
             index = self.indexAt(event.pos())
+            # Получаем элемент дерева по индексу.
             item = self.model().itemFromIndex(index)
+            # Проверяем, что элемент найден и у него нет дочерних элементов,
+            # так как менять разрешено только листья
             if item and not item.hasChildren():
+                # Открывам диалговео окно для ввода нового значения элемента.
+                # ВВод нового значения в переменную new_text.
+                # True, если пользователь нажмет "OK".
                 new_text, ok = QInputDialog.getText(
                     self,
                     "Редактирование узла",
@@ -38,8 +49,15 @@ class TreeWindow(QMainWindow):
                     text=item.text()
                 )
                 if ok:
+                    # Проверяем, что новое значение соответствует регулярному вырожению
                     if re.match("^-?\d+$", new_text):
+                        # Устанавливаем новый текст для элемента дерева.
                         item.setText(new_text)
+                        # Устанавливаем цвет если уровень изменяемого узла второй
+                        self.tree_window.checking_sign_second_node(
+                            int(new_text), item
+                        )
+                        # Вызываем метол, чтобы обновить значение родителей
                         self.tree_window.update_values(item)
                     else:
                         QMessageBox.warning(
@@ -57,35 +75,50 @@ class TreeWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         # Окно
+        # Наименование окна
         self.setWindowTitle("Дерево чисел и график")
+        # РАзмер окна и положение
         self.setGeometry(100, 100, 800, 600)
+        # Определяем размещение элементов по вертикали
         self.layout = QVBoxLayout()
 
-        # Разделитель
+        # Разделяем окно на две части
         self.splitter = QSplitter(self)
         self.layout.addWidget(self.splitter)
 
         # Дерево
+        # создаем объект CustomTreeView который от QTreeView
         self.tree_view = self.CustomTreeView(self)
+        # Создание модели данных
         self.model = QStandardItemModel()
+        # Установка моделей для нашего CustomTreeView
         self.tree_view.setModel(self.model)
+        # Добавляем дерево в layout (в компановку)
         self.layout.addWidget(self.tree_view)
+        # Создаем кнопки
         self.button_add = QPushButton("Добавить узел")
         self.button_delete = QPushButton("Удалить узел")
         self.button_create_tree = QPushButton("Создать дерево случайной глубины")
-        self.button_fill_values = QPushButton("Заполнить листья дерева")
+        self.button_fill_values = QPushButton("Заполнить пустые листья дерева случайными значениями")
+        self.save_button = QPushButton('Сохранить дерево в HDF5')
+        # Доавляем кнопки в окно
         self.layout.addWidget(self.button_add)
         self.layout.addWidget(self.button_delete)
         self.layout.addWidget(self.button_create_tree)
         self.layout.addWidget(self.button_fill_values)
+        self.layout.addWidget(self.save_button)
+        # Создание виджета QWidget для управления layout.
         self.central_widget = QWidget()
+        # Установка layout для центрального виджета.
         self.central_widget.setLayout(self.layout)
+        # Установка центрального виджета как главного виджета окна
         self.setCentralWidget(self.central_widget)
+        # Подключаем кнопки к своим методат обработки
         self.button_add.clicked.connect(self.add_node)
         self.button_delete.clicked.connect(self.delete_node)
         self.button_create_tree.clicked.connect(self.create_random_tree)
         self.button_fill_values.clicked.connect(self.fill_random_values)
-
+        self.save_button.clicked.connect(self.save_button_clicked)
         # График
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setMinimumWidth(250)
@@ -97,9 +130,12 @@ class TreeWindow(QMainWindow):
         # Подключаем сигнал к слоту
         self.tree_view.nodeSignal.connect(self.update_plot)
 
-    def create_random_tree(self, parent_item=None, depth=0, max_depth=10, min_depth=5):
-        if depth == 0:
-            parent_item = self.model.invisibleRootItem()
+    def create_random_tree(self, depth=0, max_depth=5, min_depth=4):
+        root_item = QStandardItem()
+        self.model.appendRow(root_item)
+        self.create_random_tree_recursive(root_item, depth, max_depth, min_depth)
+
+    def create_random_tree_recursive(self, parent_item, depth, max_depth, min_depth):
         if depth >= min_depth:
             num_children = random.randint(1, 4)
         else:
@@ -108,7 +144,7 @@ class TreeWindow(QMainWindow):
             new_item = QStandardItem()
             parent_item.appendRow(new_item)
             if depth < max_depth and random.random() < 0.50:
-                self.create_random_tree(new_item, depth + 1, max_depth, min_depth)
+                self.create_random_tree_recursive(new_item, depth + 1, max_depth, min_depth)
 
     def fill_random_values(self):
         current_item = self.model.invisibleRootItem()
@@ -118,11 +154,48 @@ class TreeWindow(QMainWindow):
     def fill_random_values_recursive(self, parent_item):
         if isinstance(parent_item, QStandardItem):
             if parent_item.rowCount() == 0:
-                parent_item.setText(str(random.randint(0, 100)))
+                current_value = parent_item.text()
+                if not current_value:  # Проверяем, пустое ли значение
+                    random_value = random.randint(-100, 100)
+                    parent_item.setText(str(random_value))
+                    self.checking_sign_second_node(random_value, parent_item)
             else:
                 for row in range(parent_item.rowCount()):
                     child_item = parent_item.child(row)
                     self.fill_random_values_recursive(child_item)
+                    self.update_values(child_item)
+
+    def save_button_clicked(self):
+        tree_data = self.get_tree_data()
+        file_name = 'tree_data.h5'  # Имя файла для сохранения
+        self.save_tree_to_hdf(tree_data, file_name)
+
+    def save_tree_to_hdf(self, tree_data, file_name):
+        with h5py.File(file_name, 'w') as hdf_file:
+            self.save_tree_recursive(hdf_file, tree_data)
+
+    def save_tree_recursive(self, group, data):
+        if isinstance(data, dict):
+            for key, value in data.items():
+                sub_group = group.create_group(key)
+                self.save_tree_recursive(sub_group, value)
+        elif isinstance(data, list):
+            for i, item in enumerate(data):
+                self.save_tree_recursive(group.create_group(str(i)), item)
+        else:
+            group.create_dataset('data', data=data)
+
+    def get_tree_data(self, parent_item=None):
+        if parent_item is None:
+            parent_item = self.model.invisibleRootItem()
+        data = {}
+        for i in range(parent_item.rowCount()):
+            item = parent_item.child(i)
+            if item.hasChildren():
+                data[item.text()] = self.get_tree_data(item)
+            else:
+                data[item.text()] = int(item.text())
+        return data
 
     def add_node(self):
         parent_index = self.tree_view.currentIndex()
@@ -138,6 +211,8 @@ class TreeWindow(QMainWindow):
             if re.match("^-?\d+$", new_node_name):
                 new_item = QStandardItem(new_node_name)
                 parent_item.appendRow(new_item)
+                # Устанавливаем цвет если уровень добавляемого узла второй
+                self.checking_sign_second_node(int(new_node_name), new_item)
             else:
                 QMessageBox.warning(
                     self,
@@ -151,22 +226,15 @@ class TreeWindow(QMainWindow):
         selected_indexes = self.tree_view.selectedIndexes()
         for index in selected_indexes:
             item = self.model.itemFromIndex(index)
-            if item and not item.hasChildren():
-                parent = item.parent()
-                if parent:
-                    parent.removeRow(item.row())
+            parent = item.parent()
+            if parent:
+                parent.removeRow(item.row())
+                self.update_values(parent)
+                if parent.rowCount() == 0:
+                    parent.setText("0")
                     self.update_values(parent)
-                    if parent.rowCount() == 0:
-                        parent.setText("0")
-                        self.update_values(parent)
-                else:
-                    self.model.removeRow(item.row())
             else:
-                QMessageBox.warning(
-                    self,
-                    "Ошибка",
-                    "Удалить можно только листья дерева"
-                )
+                self.model.removeRow(item.row())
         self.tree_view.nodeSignal.emit()
 
     def update_values(self, item):
