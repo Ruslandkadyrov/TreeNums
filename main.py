@@ -1,22 +1,16 @@
+import os
 import random
+import re
 import sys
-from PyQt5.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QTreeView,
-    QVBoxLayout,
-    QWidget,
-    QPushButton,
-    QInputDialog,
-    QMessageBox,
-    QSplitter
-)
-from PyQt5.QtGui import QStandardItem, QStandardItemModel, QColor
-from PyQt5.QtCore import pyqtSignal, Qt
+
+import h5py
 import numpy as np
 import pyqtgraph as pg
-import re
-import h5py
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QColor, QStandardItem, QStandardItemModel
+from PyQt5.QtWidgets import (QApplication, QInputDialog, QMainWindow,
+                             QMessageBox, QPushButton, QSplitter, QTreeView,
+                             QVBoxLayout, QWidget)
 
 
 # Создаю окно наследуюясь от QMainWindow
@@ -32,7 +26,8 @@ class TreeWindow(QMainWindow):
 
         # Метод обработки двойного щелчка мыши на элементе дерева.
         def mouseDoubleClickEvent(self, event):
-            # Получаем индекс элемента дерева по позиции клика мыши в event.pos().
+            # Получаем индекс элемента дерева
+            # по позиции клика мыши в event.pos()
             index = self.indexAt(event.pos())
             # Получаем элемент дерева по индексу.
             item = self.model().itemFromIndex(index)
@@ -49,11 +44,13 @@ class TreeWindow(QMainWindow):
                     text=item.text()
                 )
                 if ok:
-                    # Проверяем, что новое значение соответствует регулярному вырожению
-                    if re.match("^-?\d+$", new_text):
+                    # Проверяем, что новое значение соответствует
+                    # регулярному вырожению
+                    if re.match(r"^-?\d+$", new_text):
                         # Устанавливаем новый текст для элемента дерева.
                         item.setText(new_text)
-                        # Устанавливаем цвет если уровень изменяемого узла второй
+                        # Устанавливаем цвет
+                        # если уровень изменяемого узла второй
                         self.tree_window.checking_sign_second_node(
                             int(new_text), item
                         )
@@ -98,10 +95,14 @@ class TreeWindow(QMainWindow):
         # Создаем кнопки
         self.button_add = QPushButton("Добавить узел")
         self.button_delete = QPushButton("Удалить узел")
-        self.button_create_tree = QPushButton("Создать дерево случайной глубины")
-        self.button_fill_values = QPushButton("Заполнить пустые листья дерева случайными значениями")
-        self.save_button = QPushButton('Сохранить дерево в HDF5')
-        self.download_button = QPushButton('Загрузить дерево из HDF5')
+        self.button_create_tree = QPushButton(
+            "Создать дерево случайной глубины"
+        )
+        self.button_fill_values = QPushButton(
+            "Заполнить пустые листья дерева случайными значениями"
+        )
+        self.save_button = QPushButton("Сохранить дерево в HDF5")
+        self.download_button = QPushButton("Загрузить дерево из HDF5")
         # Доавляем кнопки в окно
         self.layout.addWidget(self.button_add)
         self.layout.addWidget(self.button_delete)
@@ -141,9 +142,13 @@ class TreeWindow(QMainWindow):
         # Добавляем корневой элемент в моель
         self.model.appendRow(root_item)
         # Запускаем метод создания дерева
-        self.create_random_tree_recursive(root_item, depth, max_depth, min_depth)
+        self.create_random_tree_recursive(
+            root_item, depth, max_depth, min_depth
+        )
 
-    def create_random_tree_recursive(self, parent_item, depth, max_depth, min_depth):
+    def create_random_tree_recursive(
+            self, parent_item, depth, max_depth, min_depth
+    ):
         # Если тукущая глубина больше либо равно минимальной,
         # то рандомно назначается количесто дочерних узлоа от 1 до 4
         # иначе назначается 4
@@ -159,7 +164,9 @@ class TreeWindow(QMainWindow):
             # также устанвлена 50% вероятность дальнейшей рекурсии
             if depth < max_depth and random.random() < 0.50:
                 # при запуске рекурсии увеличиваем глубину на 1
-                self.create_random_tree_recursive(new_item, depth + 1, max_depth, min_depth)
+                self.create_random_tree_recursive(
+                    new_item, depth + 1, max_depth, min_depth
+                )
 
     def fill_random_values(self):
         # находим коренвой елемент
@@ -179,12 +186,13 @@ class TreeWindow(QMainWindow):
                     random_value = random.randint(-100, 100)
                     # присваиваем это значение к нашему элементу
                     parent_item.setText(str(random_value))
-                    # и прогоняем этот элемент через метод который назначает цвет 
-                    # если элемент является второго уровня
+                    # и прогоняем этот элемент через метод который назначает
+                    # цвет если элемент является второго уровня
                     self.checking_sign_second_node(random_value, parent_item)
             else:
                 # если же у входящего элемента есть дочерние элементы
-                # итерируемся по дочерним элементам и рекурсией присваеиваем им значения
+                # итерируемся по дочерним элементам и рекурсией
+                # присваеиваем им значения
                 for row in range(parent_item.rowCount()):
                     child_item = parent_item.child(row)
                     self.fill_random_values_recursive(child_item)
@@ -222,8 +230,10 @@ class TreeWindow(QMainWindow):
 
     # метод сохранения дерева в файл
     def save_tree_to_hdf(self, tree_data, file_name):
-        # открываем файл tree_data.h5 для записи
-        with h5py.File(file_name, 'w') as hdf_file:
+        # Получаем путь к директории
+        current_dir = os.path.dirname(sys.argv[0])
+        file_path = os.path.join(current_dir, file_name)
+        with h5py.File(file_path, 'w') as hdf_file:
             # вызываем рекусривный метод для сохраненения данные дерева в файл
             self.save_tree_recursive(hdf_file, tree_data)
 
@@ -242,12 +252,13 @@ class TreeWindow(QMainWindow):
     def download_button_clicked(self):
         # устанавливаем имя файла
         file_name = 'tree_data.h5'
-        # с помощью метода load_tree_from_hdf 
+        # с помощью метода load_tree_from_hdf
         # выгружаем данные дерева в tree_data из файла
         tree_data = self.load_tree_from_hdf(file_name)
         # если данные дерева получены
         if tree_data:
-            # то с помощью метода update_tree_view изменяем представление данных дерева
+            # то с помощью метода update_tree_view
+            # изменяем представление данных дерева
             self.update_tree_view(tree_data)
             # подоем сигнал для обновления графика
             self.tree_view.nodeSignal.emit()
@@ -292,7 +303,8 @@ class TreeWindow(QMainWindow):
                 parent_item.appendRow(new_item)
                 # проверяем нужно ли определить знак элемента и добавить цвет
                 self.checking_sign_second_node(int(key), new_item)
-                # рекуснивно вызываем метод update_tree_view с новыми данными value и new_item
+                # рекуснивно вызываем метод update_tree_view
+                # с новыми данными value и new_item
                 self.update_tree_view(value, new_item)
             else:
                 # если же нет вложенности
@@ -319,7 +331,7 @@ class TreeWindow(QMainWindow):
         # если пользователь нажал ОК
         if ok:
             # если введенное значение число
-            if re.match("^-?\d+$", new_node_name):
+            if re.match(r"^-?\d+$", new_node_name):
                 # создаем новый элемент
                 new_item = QStandardItem(new_node_name)
                 # добвалем его как дочерний к выбранному узлу
@@ -344,25 +356,33 @@ class TreeWindow(QMainWindow):
         index = self.tree_view.currentIndex()
         # получаем элемент модели по этому индексу
         item = self.model.itemFromIndex(index)
-        # получаем родителя этого элемнта
-        parent = item.parent()
-        # если есть родитель
-        if parent:
-            # то удаляем выбранный узел
-            parent.removeRow(item.row())
-            # и обновляем значения родительских узлов
-            self.update_values(parent)
-            # если в этом родителськом узле не останется дочерних узлов
-            if parent.rowCount() == 0:
-                # то присваиваем значение 0
-                parent.setText("0")
-                # и так же обновляем значения родительских узлов
+        # обязательно должен быть выбран узел
+        if item:
+            # получаем родителя этого элемнта
+            parent = item.parent()
+            # если есть родитель
+            if parent:
+                # то удаляем выбранный узел
+                parent.removeRow(item.row())
+                # и обновляем значения родительских узлов
                 self.update_values(parent)
+                # если в этом родителськом узле не останется дочерних узлов
+                if parent.rowCount() == 0:
+                    # то присваиваем значение 0
+                    parent.setText("0")
+                    # и так же обновляем значения родительских узлов
+                    self.update_values(parent)
+            else:
+                # если же нет родителя то просто удаляем узел из корня модели
+                self.model.removeRow(item.row())
+            # сигнализируем об обновлении графика
+            self.tree_view.nodeSignal.emit()
         else:
-            # если же нет родителя то просто удаляем узел из корня модели
-            self.model.removeRow(item.row())
-        # сигнализируем об обновлении графика
-        self.tree_view.nodeSignal.emit()
+            QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    "Выберите узел"
+                )
 
     # метод обнвления родительских узлов при добвалении/измении листьев дерева
     # или удалении узла
@@ -374,7 +394,9 @@ class TreeWindow(QMainWindow):
                 # Создаем массив NumPy значений дочерних элементов,
                 # преобразуя текст в целое число или 0, если текст пустой.
                 child_values = np.array([
-                    int(item.child(i).text()) if item.child(i).text() else 0 for i in range(item.rowCount())
+                    int(item.child(i).text())
+                    if item.child(i).text()
+                    else 0 for i in range(item.rowCount())
                 ])
                 # Рекурсивно обновляем значения для каждого дочернего элемента.
                 for i in range(item.rowCount()):
@@ -392,7 +414,9 @@ class TreeWindow(QMainWindow):
                 # Создаем массив NumPy значений дочерних элементов,
                 # преобразуя текст в целое число или 0, если текст пустой.
                 child_values = np.array([
-                    int(parent.child(i).text()) if parent.child(i).text() else 0 for i in range(parent.rowCount())
+                    int(parent.child(i).text())
+                    if parent.child(i).text()
+                    else 0 for i in range(parent.rowCount())
                 ])
                 # Суммируем значения дочерних элементов этого родителя
                 parent_value = np.sum(child_values)
@@ -411,8 +435,11 @@ class TreeWindow(QMainWindow):
         # если есть у переданного узла родитель
         if node.parent():
             # проверяем является ли этот узел второго уронвя
-            if node.parent().parent() and node.parent().parent().parent() is None:
-                # если переданный узел является второго уровня 
+            if (
+                node.parent().parent()
+                and node.parent().parent().parent() is None
+            ):
+                # если переданный узел является второго уровня
                 # то в зависимости каким является его значениее определяем цвет
                 if value > 0:
                     node.setBackground(QColor("green"))
@@ -421,31 +448,37 @@ class TreeWindow(QMainWindow):
 
     # обработчик сигнала об обновлении графика
     def update_plot(self):
-        # с помощью метода get_tree_avg_values 
+        # с помощью метода get_tree_avg_values
         # возвращаем средние значения уровней из дерева self.tree_view
         avg_values = self.get_tree_avg_values(self.tree_view)
         # фильтруем от ненулевых значении
-        filtered_avg_values = [value for value in avg_values if value is not None]
+        filtered_avg_values = [
+            value for value in avg_values if value is not None
+        ]
         # определяем уровни дерева
         levels = list(range(len(filtered_avg_values)))
         # удаляем старый график перед обновлением
         self.plot_widget.clear()
         # строим график levels это ось Х и filtered_avg_values как ось Y
         # цвет линии синий и строим линии от точки до точки
-        self.plot_widget.plot(levels,  filtered_avg_values, pen=pg.mkPen('b'))
+        self.plot_widget.plot(levels,  filtered_avg_values, pen=pg.mkPen("b"))
 
     # метод возвращения средних значении уровней дерева
     def get_tree_avg_values(self, tree_view):
         # Создается пустой список level_values,
         # в котором будут значения узлов на каждом уровне дерева.
         level_values = []
-        # с помощью метода calculate_avg_values 
+        # с помощью метода calculate_avg_values
         # заполняем значениями узлов каждого уровня
         # начиная с корневого элемнта
-        self.calculate_avg_values(tree_view.model().invisibleRootItem(), level_values, 0)
+        self.calculate_avg_values(
+            tree_view.model().invisibleRootItem(), level_values, 0
+        )
         # создаем новый список для среднийх значении каждого уровня
         # используя список котрый мы получили из метода calculate_avg_values
-        avg_values = [np.mean(level) if level.any() else None for level in level_values]
+        avg_values = [
+            np.mean(level) if level.any() else None for level in level_values
+        ]
         return avg_values
 
     # метод формирования сиписка списков значении узлов
@@ -469,7 +502,9 @@ class TreeWindow(QMainWindow):
         # для каждого дочернего переданного узла
         # рекусрвино вызываем calculate_avg_values увеличивая уровнеь на 1
         for i in range(tree_item.rowCount()):
-            self.calculate_avg_values(tree_item.child(i), level_values, level + 1)
+            self.calculate_avg_values(
+                tree_item.child(i), level_values, level + 1
+            )
 
 
 if __name__ == "__main__":
