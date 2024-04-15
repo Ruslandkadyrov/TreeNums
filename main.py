@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
     QSplitter
 )
 from PyQt5.QtGui import QStandardItem, QStandardItemModel, QColor
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, Qt
 import numpy as np
 import pyqtgraph as pg
 import re
@@ -83,7 +83,7 @@ class TreeWindow(QMainWindow):
         self.layout = QVBoxLayout()
 
         # Разделяем окно на две части
-        self.splitter = QSplitter(self)
+        self.splitter = QSplitter(Qt.Vertical, self)
         self.layout.addWidget(self.splitter)
 
         # Дерево
@@ -124,11 +124,12 @@ class TreeWindow(QMainWindow):
         self.download_button.clicked.connect(self.download_button_clicked)
         # График
         self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setMinimumWidth(250)
-        self.plot_widget.setMaximumWidth(500)
 
-        self.splitter.addWidget(self.plot_widget)
+        # определяем расположение виджетов
         self.splitter.addWidget(self.tree_view)
+        self.splitter.addWidget(self.plot_widget)
+        # разделитель делим ровно по палам для дерева и графика
+        self.splitter.setStretchFactor(1, 1)
 
         # Подключаем сигнал к обнавлению графика
         self.tree_view.nodeSignal.connect(self.update_plot)
